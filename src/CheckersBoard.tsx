@@ -32,12 +32,19 @@ export default function CheckersBoard({ cell = 72 }: Props) {
           {Array.from({ length: rows }).map((_, r) =>
             Array.from({ length: cols }).map((_, c) => {
               const isDark = (r + c) % 2 === 1;
+              let piece: "dark" | "light" | null = null;
+              if (isDark) {
+                if (r < 3) piece = "dark";
+                if (r >= rows - 3) piece = "light";
+              }
+              const pieceDescription =
+                piece === "dark" ? " mit schwarzem Spielstein" : piece === "light" ? " mit hellem Spielstein" : "";
               const key = `${r}-${c}`;
               return (
                 <div
                   key={key}
                   role="gridcell"
-                  aria-label={`Feld ${files[c]}${rows - r}`}
+                  aria-label={`Feld ${files[c]}${rows - r}${pieceDescription}`}
                   data-row={r}
                   data-col={c}
                   className={
@@ -46,6 +53,15 @@ export default function CheckersBoard({ cell = 72 }: Props) {
                   }
                   style={{ width: cell, height: cell }}
                 >
+                  {piece && (
+                    <span
+                      className={
+                        "w-3/4 h-3/4 rounded-full border-[3px] border-neutral-900/40 shadow-[inset_0_2px_6px_rgba(255,255,255,0.35),0_2px_6px_rgba(0,0,0,0.35)] " +
+                        (piece === "dark" ? "bg-neutral-800" : "bg-amber-200")
+                      }
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
               );
             })
