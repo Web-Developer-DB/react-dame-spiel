@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 // Diese Komponente stellt ein simples Damebrett inklusive Bewegungslogik dar.
 // Die Kommentare erklären Schritt für Schritt, wie die Datenstrukturen und
 // Hooks zusammenarbeiten – ideal, wenn man neu im React- oder TypeScript-Umfeld ist.
@@ -25,10 +25,11 @@ export default function CheckersBoard({ cell = 72 }: Props) {
   // Das Spielbrett ist ein Quadrat; BOARD_SIZE legt Zeilen und Spalten fest.
   const rows = BOARD_SIZE;
   const cols = BOARD_SIZE;
+  const [cellSize, setCellSize] = useState(cell);
   // CSS Grid wird genutzt, um ein flexibles Layout für das Brett zu erstellen.
   const gridStyle: React.CSSProperties = {
-    gridTemplateColumns: `repeat(${cols}, ${cell}px)`,
-    gridTemplateRows: `repeat(${rows}, ${cell}px)`,
+    gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
+    gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
   };
   // Files und Ranks dienen dazu, Koordinatenbeschriftungen (A–H / 1–8) anzuzeigen.
   const files = Array.from({ length: cols }, (_, i) => String.fromCharCode(65 + i));
@@ -43,6 +44,12 @@ export default function CheckersBoard({ cell = 72 }: Props) {
   const [availableMoves, setAvailableMoves] = useState<Move[]>([]);
   // multiCaptureActive: merkt sich, ob wir uns mitten in einer Mehrfachschlag-Sequenz befinden.
   const [multiCaptureActive, setMultiCaptureActive] = useState(false);
+  // showHints: blendet visuelle Hinweise wie Schlagzwang und Zielringe ein oder aus.
+  const [showHints, setShowHints] = useState(true);
+
+  useEffect(() => {
+    setCellSize(cell);
+  }, [cell]);
 
   // forcedCapturePositions liefert alle Steine, die aktuell schlagen müssen (Schlagzwang).
   const forcedCapturePositions = useMemo(
@@ -50,6 +57,30 @@ export default function CheckersBoard({ cell = 72 }: Props) {
     [board, currentPlayer]
   );
   const hasForcedCaptures = forcedCapturePositions.length > 0;
+  const highlightedForcedCapturePositions = showHints ? forcedCapturePositions : [];
+
+  const handleNewGame = () => {
+    setBoard(createInitialBoard(rows, cols));
+    setCurrentPlayer("human");
+    setSelected(null);
+    setAvailableMoves([]);
+    setMultiCaptureActive(false);
+  };
+
+  const handleSwitchStartingPlayer = () => {
+    setCurrentPlayer((prevPlayer) => (prevPlayer === "human" ? "ai" : "human"));
+    setSelected(null);
+    setAvailableMoves([]);
+    setMultiCaptureActive(false);
+  };
+
+  const handleCellSizeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCellSize(Number(event.target.value));
+  };
+
+  const handleToggleHints = () => {
+    setShowHints((prev) => !prev);
+  };
 
   const handleCellClick = (row: number, col: number) => {
     const targetPosition: Position = { row, col };
@@ -152,20 +183,77 @@ export default function CheckersBoard({ cell = 72 }: Props) {
 
   return (
     <div className="w-full flex flex-col items-center gap-4 p-6">
+      <div className="w-full max-w-4xl">
+        <div className="rounded-2xl border border-neutral-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Spielmenü</p>
+                <p className="text-sm text-neutral-700">Passe deine Partie an oder starte neu.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleNewGame}
+                  className="inline-flex items-center gap-1 rounded-full bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                >
+                  Neues Spiel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSwitchStartingPlayer}
+                  className="inline-flex items-center gap-1 rounded-full border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  title={multiCaptureActive ? "Während eines Mehrfachschlags nicht verfügbar" : "Aktuellen Spieler wechseln"}
+                  disabled={multiCaptureActive}
+                >
+                  Spieler wechseln
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-neutral-700">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-indigo-500"
+                  checked={showHints}
+                  onChange={handleToggleHints}
+                />
+                Tipps hervorheben
+              </label>
+              <label className="flex items-center gap-3">
+                <span>Feldgröße</span>
+                <input
+                  type="range"
+                  min={56}
+                  max={96}
+                  step={8}
+                  value={cellSize}
+                  onChange={handleCellSizeChange}
+                  aria-label="Feldgröße anpassen"
+                />
+                <span className="w-12 text-right tabular-nums">{cellSize}px</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <h1 className="text-xl font-semibold">Dame – Spielbrett</h1>
 
       <div className="flex items-start gap-2">
-        <div className="flex flex-col-reverse select-none pr-1 mt-[2px]" style={{ height: rows * cell }}>
+        <div className="mt-[2px] flex flex-col-reverse select-none pr-1" style={{ height: rows * cellSize }}>
           {ranks.map((r) => (
             // Reihenbeschriftung links vom Brett, damit Spieler sich orientieren können.
-            <div key={r} className="h-[--cell] flex items-center justify-end text-xs text-neutral-600" style={{ height: cell }}>{r}</div>
+            <div key={r} className="flex items-center justify-end text-xs text-neutral-600" style={{ height: cellSize }}>
+              {r}
+            </div>
           ))}
         </div>
 
         <div
           role="grid"
           aria-label="Damebrett 8 mal 8"
-          className="grid rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-neutral-300"
+          className="grid overflow-hidden rounded-2xl border border-neutral-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)]"
           style={gridStyle}
         >
           {board.map((boardRow, r) =>
@@ -173,8 +261,9 @@ export default function CheckersBoard({ cell = 72 }: Props) {
               const isDark = (r + c) % 2 === 1;
               const position: Position = { row: r, col: c };
               const isSelected = selected ? positionsEqual(selected, position) : false;
-              const isMoveTarget = availableMoves.some((move) => positionsEqual(move.to, position));
-              const isForcedPiece = forcedCapturePositions.some((pos) => positionsEqual(pos, position));
+              const isPotentialMoveTarget = availableMoves.some((move) => positionsEqual(move.to, position));
+              const isMoveTarget = showHints && isPotentialMoveTarget;
+              const isForcedPiece = highlightedForcedCapturePositions.some((pos) => positionsEqual(pos, position));
 
               const pieceDescription =
                 cellPiece?.color === "dark"
@@ -198,25 +287,25 @@ export default function CheckersBoard({ cell = 72 }: Props) {
                   className={[
                     "relative flex items-center justify-center select-none transition-colors",
                     isDark ? "bg-emerald-700" : "bg-emerald-200",
-                    (cellPiece && cellPiece.owner === currentPlayer) || isMoveTarget ? "cursor-pointer" : "",
+                    (cellPiece && cellPiece.owner === currentPlayer) || isPotentialMoveTarget ? "cursor-pointer" : "",
                     isSelected ? "ring-4 ring-indigo-400 ring-offset-2 ring-offset-neutral-100" : "",
                     !isSelected && isForcedPiece ? "ring-2 ring-amber-500/70 ring-offset-2 ring-offset-neutral-100" : "",
                     isMoveTarget ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-neutral-100" : "",
                   ].join(" ")}
-                  style={{ width: cell, height: cell }}
+                  style={{ width: cellSize, height: cellSize }}
                   onClick={() => handleCellClick(r, c)}
                 >
                   {cellPiece && (
                     <span
                       className={
                         // Darstellung eines Spielsteins mit Schatten, um etwas 3D-Feeling zu erzeugen.
-                        "relative w-3/4 h-3/4 rounded-full border-[3px] border-neutral-900/40 shadow-[inset_0_2px_6px_rgba(255,255,255,0.35),0_2px_6px_rgba(0,0,0,0.35)] " +
+                        "relative h-3/4 w-3/4 rounded-full border-[3px] border-neutral-900/40 shadow-[inset_0_2px_6px_rgba(255,255,255,0.35),0_2px_6px_rgba(0,0,0,0.35)] " +
                         (cellPiece.color === "dark" ? "bg-neutral-800" : "bg-amber-200")
                       }
                       aria-hidden="true"
                     >
                       {cellPiece.king && (
-                        <span className="absolute inset-[18%] rounded-full border-2 border-amber-400/90 shadow-[0_0_4px_rgba(0,0,0,0.25)] pointer-events-none" />
+                        <span className="pointer-events-none absolute inset-[18%] rounded-full border-2 border-amber-400/90 shadow-[0_0_4px_rgba(0,0,0,0.25)]" />
                       )}
                     </span>
                   )}
@@ -227,14 +316,18 @@ export default function CheckersBoard({ cell = 72 }: Props) {
         </div>
       </div>
 
-      <div className="grid select-none" style={{ gridTemplateColumns: `repeat(${cols}, ${cell}px)` }}>
+      <div className="grid select-none" style={{ gridTemplateColumns: `repeat(${cols}, ${cellSize}px)` }}>
         {files.map((f) => (
           // Spaltenbeschriftung unterhalb des Bretts.
-          <div key={f} className="text-center text-xs text-neutral-600" style={{ width: cell }}>{f}</div>
+          <div key={f} className="text-center text-xs text-neutral-600" style={{ width: cellSize }}>
+            {f}
+          </div>
         ))}
       </div>
 
-      <div className="text-sm text-neutral-600">Tipp: Passe die Zellgröße über Prop <code>cell</code> an.</div>
+      <div className="text-sm text-neutral-600">
+        Tipp: Passe die Zellgröße über das Menü oder per Prop <code>cell</code> an.
+      </div>
 
       <div className="text-sm text-neutral-700">
         Am Zug: <span className="font-medium">{currentPlayerLabel}</span>
