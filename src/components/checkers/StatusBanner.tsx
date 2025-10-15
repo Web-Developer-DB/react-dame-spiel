@@ -1,3 +1,4 @@
+// Kleine Anzeige-Komponente, die den aktuellen Status der Partie beschreibt.
 import React from "react";
 
 type StatusBannerProps = {
@@ -17,6 +18,7 @@ export function StatusBanner({
   statusSuffix,
   multiCaptureActive,
 }: StatusBannerProps) {
+  // Sobald gameOver wahr ist, zeigen wir einen deutlich markierten Endtext.
   if (gameOver) {
     return (
       <div className="text-sm text-neutral-700">
@@ -27,6 +29,7 @@ export function StatusBanner({
     );
   }
 
+  // Während der laufenden Partie informieren wir, wer am Zug ist und ob ein Schlagzwang besteht.
   return (
     <div className="text-sm text-neutral-700">
       Am Zug: <span className="font-medium">{currentPlayerLabel}</span>

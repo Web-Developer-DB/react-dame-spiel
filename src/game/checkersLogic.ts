@@ -1,3 +1,4 @@
+// Enthält die komplette Spielregeln-Logik für Dame (ohne direkte UI-Abhängigkeiten).
 import { Board, CandidateMove, GameEvaluation, Move, Piece, Player, Position } from "./checkersTypes";
 
 // Konstante Brettgröße. 8x8 ist der Standard für Dame,
@@ -5,6 +6,7 @@ import { Board, CandidateMove, GameEvaluation, Move, Piece, Player, Position } f
 export const BOARD_SIZE = 8;
 
 // Erstellt das Brett zum Spielbeginn. Nur dunkle Felder erhalten Steine.
+// Einsteiger-Tipp: Array.from erzeugt hier eine verschachtelte Matrix aus Zeilen und Spalten.
 export function createInitialBoard(rows = BOARD_SIZE, cols = BOARD_SIZE): Board {
   return Array.from({ length: rows }, (_, r) =>
     Array.from({ length: cols }, (_, c) => {
@@ -25,6 +27,7 @@ export function cloneBoard(board: Board): Board {
 
 // Liefert alle legalen Ziele für einen Stein.
 // Es werden einfache Züge und Sprünge (mit capture) berechnet.
+// Tipp für Anfänger: Die Schleifen testen jede der vier diagonalen Richtungen.
 export function getMoves(board: Board, row: number, col: number, piece: Piece): Move[] {
   const moves: Move[] = [];
   const verticalDirections = piece.king ? [1, -1] : [piece.color === "dark" ? 1 : -1];
@@ -59,6 +62,7 @@ export function getMoves(board: Board, row: number, col: number, piece: Piece): 
 }
 
 // Schlagzwang: Wenn ein eigener Stein schlagen kann, muss er es tun.
+// Wir sammeln daher alle Positionen, die mindestens einen Schlagzug besitzen.
 export function findForcedCapturePositions(board: Board, player: Player): Position[] {
   const forced: Position[] = [];
   board.forEach((row, r) => {
@@ -74,6 +78,7 @@ export function findForcedCapturePositions(board: Board, player: Player): Positi
 }
 
 // Hilfsfunktion, um alle möglichen Züge eines Spielers zu sammeln.
+// Entscheidend für die KI und die Siegbedingungen.
 export function collectMovesForPlayer(board: Board, player: Player): CandidateMove[] {
   const moves: CandidateMove[] = [];
   board.forEach((row, r) => {
@@ -92,6 +97,7 @@ export function collectMovesForPlayer(board: Board, player: Player): CandidateMo
 }
 
 // Die KI bevorzugt Züge mit der höchsten Schlaganzahl und entscheidet erst danach zufällig.
+// So wirkt sie strategischer, bleibt aber dennoch leicht verständlich.
 export function chooseMoveByPriority(candidates: CandidateMove[]): CandidateMove | null {
   if (candidates.length === 0) {
     return null;
@@ -117,6 +123,7 @@ export function chooseContinuationMove(moves: Move[]): Move {
 }
 
 // Überträgt einen Zug auf ein neues Board und berechnet Folgezüge für Mehrfachschläge.
+// Achtung: Die Funktion gibt immer ein neues Board zurück, damit React Änderungen erkennt.
 export function applyMove(
   prevBoard: Board,
   from: Position,
@@ -157,13 +164,30 @@ export function applyMove(
 }
 
 // Prüft, ob eine Partei verloren hat (keine Steine oder keine Züge).
+// evaluateGameState wird nach jedem Zug aufgerufen.
 export function evaluateGameState(board: Board, playerToMove: Player): GameEvaluation | null {
   const opponent = playerToMove === "human" ? "ai" : "human";
-  const remainingPieces = countPieces(board, playerToMove);
-  if (remainingPieces === 0) {
+  const humanPieces = countPieces(board, "human");
+  const aiPieces = countPieces(board, "ai");
+
+  if (humanPieces === 0 && aiPieces === 0) {
     return {
       winner: opponent,
-      message: `Sieg für ${getPlayerLabel(opponent)} – ${getPlayerLabel(playerToMove)} hat keine Steine mehr.`,
+      message: `Sieg für ${getPlayerLabel(opponent)} – beide Seiten haben keine Steine mehr.`,
+    };
+  }
+
+  if (humanPieces === 0) {
+    return {
+      winner: "ai",
+      message: `Sieg für ${getPlayerLabel("ai")} – ${getPlayerLabel("human")} hat keine Steine mehr.`,
+    };
+  }
+
+  if (aiPieces === 0) {
+    return {
+      winner: "human",
+      message: `Sieg für ${getPlayerLabel("human")} – ${getPlayerLabel("ai")} hat keine Steine mehr.`,
     };
   }
 
@@ -178,18 +202,22 @@ export function evaluateGameState(board: Board, playerToMove: Player): GameEvalu
   return null;
 }
 
+// Hilfsfunktion: Zwei Positionen sind identisch, wenn Zeile und Spalte übereinstimmen.
 export function positionsEqual(a: Position, b: Position): boolean {
   return a.row === b.row && a.col === b.col;
 }
 
+// Liefert einen freundlichen Namen für den Spieler, um Meldungen zu formulieren.
 export function getPlayerLabel(player: Player): string {
   return player === "human" ? "den Menschen" : "die KI";
 }
 
+// stellt sicher, dass wir nicht versehentlich außerhalb des Arrays lesen.
 function isWithinBoard(board: Board, row: number, col: number): boolean {
   return row >= 0 && row < board.length && col >= 0 && col < board[0].length;
 }
 
+// Zählt, wie viele Steine einem Spieler aktuell gehören.
 function countPieces(board: Board, player: Player): number {
   let count = 0;
   board.forEach((row) => {
