@@ -25,6 +25,7 @@ import { Board, Move, Player, Position } from "./game/checkersTypes";
 export default function CheckersBoard() {
   const rows = BOARD_SIZE;
   const cols = BOARD_SIZE;
+  const [isCompactLayout, setIsCompactLayout] = useState(false);
 
   // Layout-bezogene Daten wie Feldbeschriftungen lassen sich aus der Brettgröße ableiten.
   // useMemo stellt sicher, dass wir die Arrays nur neu berechnen, wenn sich rows/cols ändern.
@@ -45,7 +46,7 @@ export default function CheckersBoard() {
   // multiCaptureActive markiert, ob ein Mehrfachschlag in einer laufenden Animation fortgeführt wird.
   const [multiCaptureActive, setMultiCaptureActive] = useState(false);
   // showHints entscheidet, ob visuelle Hilfen eingeblendet werden.
-  const [showHints, setShowHints] = useState(true);
+  const showHints = true;
   // gameOver markiert, ob die Partie beendet ist.
   const [gameOver, setGameOver] = useState(false);
   // outcomeMessage fasst den Gewinner-Text für Spieler zusammen.
@@ -63,20 +64,21 @@ export default function CheckersBoard() {
       return;
     }
 
-    const gapBetweenLabelsAndBoard = 8; // entspricht Tailwind gap-2
+    const gapBetweenLabelsAndBoard = isCompactLayout ? 0 : 8;
+    const columnsForSizing = isCompactLayout ? cols : cols + 1;
     const effectiveWidth = Math.max(containerWidth - gapBetweenLabelsAndBoard, 0);
-    const maxAllowedCellSize = Math.floor(effectiveWidth / (cols + 1));
+    const maxAllowedCellSize = Math.floor(effectiveWidth / columnsForSizing);
     if (maxAllowedCellSize <= 0) {
       return;
     }
 
-    const minCellSize = 48;
-    const maxCellSize = 96;
+    const minCellSize = isCompactLayout ? 56 : 48;
+    const maxCellSize = 104;
     const preferredSize = Math.min(maxAllowedCellSize, maxCellSize);
     const nextSize = Math.min(maxAllowedCellSize, Math.max(preferredSize, minCellSize));
 
     setCellSize((prev) => (prev !== nextSize ? nextSize : prev));
-  }, [cols]);
+  }, [cols, isCompactLayout]);
 
   // Beim ersten Render die Größe berechnen.
   useEffect(() => {
@@ -106,6 +108,28 @@ export default function CheckersBoard() {
     return () => observer.disconnect();
   }, [updateCellSize]);
 
+  // Beobachtet, ob wir uns im kompakten (mobilen) Layout befinden.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const handleMediaChange = (event: MediaQueryListEvent) => {
+      setIsCompactLayout(event.matches);
+    };
+
+    setIsCompactLayout(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleMediaChange);
+      return () => mediaQuery.removeEventListener("change", handleMediaChange);
+    }
+
+    mediaQuery.addListener(handleMediaChange);
+    return () => mediaQuery.removeListener(handleMediaChange);
+  }, []);
+
   // Sobald das Spiel vorbei ist, wird automatisch das Ergebnis-Overlay geöffnet.
   useEffect(() => {
     if (gameOver) {
@@ -133,11 +157,6 @@ export default function CheckersBoard() {
     setGameOver(false);
     setOutcomeMessage(null);
     setShowOutcomeDialog(false);
-  };
-
-  // Einsteigerfreundliche Option, um Hinweise während der Partie an- oder auszuschalten.
-  const handleToggleHints = () => {
-    setShowHints((prev) => !prev);
   };
 
   // Einfache KI, die alle erlaubten Züge des Computers berechnet und einen auswählt.
@@ -280,17 +299,15 @@ export default function CheckersBoard() {
   const statusSuffix = !gameOver && hasForcedCaptures ? " – Schlagzwang" : "";
 
   return (
-    <div className="w-full flex flex-col items-center gap-4 p-6">
+    <div className="flex w-full flex-col items-center gap-3 p-4 sm:gap-4 sm:p-6">
       <div className="w-full max-w-4xl">
         {/* Das Menü bietet Steuerungen, die nicht direkt in das Brett eingreifen müssen */}
         <GameMenu
           onNewGame={handleNewGame}
-          showHints={showHints}
-          onToggleHints={handleToggleHints}
         />
       </div>
 
-      <h1 className="text-xl font-semibold">Dame – Spielbrett</h1>
+      <h1 className="text-lg font-semibold sm:text-xl">Dame – Spielbrett</h1>
 
       <div ref={boardContainerRef} className="w-full max-w-4xl">
         {/* CheckersGrid ist allein für die Darstellung des Bretts verantwortlich */}
@@ -304,22 +321,25 @@ export default function CheckersBoard() {
           forcedCapturePositions={shouldHighlightHints ? forcedCapturePositions : []}
           showHints={shouldHighlightHints}
           isHumansTurn={isHumansTurn}
+          compactLayout={isCompactLayout}
           onCellClick={handleCellClick}
         />
       </div>
 
-      <div className="text-sm text-neutral-600">
+      <div className="hidden text-xs text-neutral-500 sm:block sm:text-sm sm:text-neutral-600">
         Tipp: Die Zellgröße passt sich automatisch an den verfügbaren Platz an.
       </div>
 
       {/* Der StatusBanner fasst verbleibende Hinweise zusammen */}
-      <StatusBanner
-        gameOver={gameOver}
-        outcomeMessage={outcomeMessage}
-        currentPlayerLabel={currentPlayerLabel}
-        statusSuffix={statusSuffix}
-        multiCaptureActive={multiCaptureActive}
-      />
+      <div className="w-full max-w-4xl text-center sm:text-left">
+        <StatusBanner
+          gameOver={gameOver}
+          outcomeMessage={outcomeMessage}
+          currentPlayerLabel={currentPlayerLabel}
+          statusSuffix={statusSuffix}
+          multiCaptureActive={multiCaptureActive}
+        />
+      </div>
 
       {showOutcomeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 px-4">
