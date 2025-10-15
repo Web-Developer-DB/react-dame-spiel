@@ -1,0 +1,266 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { GameMenu } from "./components/checkers/GameMenu";
+import { CheckersGrid } from "./components/checkers/CheckersGrid";
+import { StatusBanner } from "./components/checkers/StatusBanner";
+import {
+  applyMove,
+  chooseContinuationMove,
+  chooseMoveByPriority,
+  collectMovesForPlayer,
+  createInitialBoard,
+  evaluateGameState,
+  findForcedCapturePositions,
+  getPlayerLabel,
+  getMoves,
+  positionsEqual,
+  BOARD_SIZE,
+} from "./game/checkersLogic";
+import { Board, Move, Player, Position } from "./game/checkersTypes";
+
+type Props = { cell?: number };
+
+// Die CheckersBoard-Komponente verwaltet den gesamten Spielfluss.
+// Sie orchestriert State, KI-Züge und Darstellung, delegiert aber Render-Details
+// an kleinere Komponenten (GameMenu, CheckersGrid, StatusBanner).
+export default function CheckersBoard({ cell = 72 }: Props) {
+  const rows = BOARD_SIZE;
+  const cols = BOARD_SIZE;
+
+  // Layout-bezogene Daten wie Feldbeschriftungen lassen sich aus der Brettgröße ableiten.
+  const files = useMemo(() => Array.from({ length: cols }, (_, i) => String.fromCharCode(65 + i)), [cols]);
+  const ranks = useMemo(() => Array.from({ length: rows }, (_, i) => `${rows - i}`), [rows]);
+
+  // Zustand des Spiels
+  const [cellSize, setCellSize] = useState(cell);
+  const [board, setBoard] = useState<Board>(() => createInitialBoard(rows, cols));
+  const [currentPlayer, setCurrentPlayer] = useState<Player>("human");
+  const [selected, setSelected] = useState<Position | null>(null);
+  const [availableMoves, setAvailableMoves] = useState<Move[]>([]);
+  const [multiCaptureActive, setMultiCaptureActive] = useState(false);
+  const [showHints, setShowHints] = useState(true);
+  const [gameOver, setGameOver] = useState(false);
+  const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
+
+  // Wenn der cell-Prop (z. B. über App.tsx) angepasst wird, übernehmen wir den neuen Wert.
+  useEffect(() => {
+    setCellSize(cell);
+  }, [cell]);
+
+  // Schlagzwang und mögliche Züge werden aus dem aktuellen Brett abgeleitet.
+  const forcedCapturePositions = useMemo(
+    () => findForcedCapturePositions(board, currentPlayer),
+    [board, currentPlayer]
+  );
+  const hasForcedCaptures = forcedCapturePositions.length > 0;
+  const shouldHighlightHints = showHints && !gameOver;
+  const isHumansTurn = currentPlayer === "human" && !gameOver;
+
+  // Stellt den Ausgangszustand wieder her, damit mehrere Partien nacheinander möglich sind.
+  const handleNewGame = () => {
+    setBoard(createInitialBoard(rows, cols));
+    setCurrentPlayer("human");
+    setSelected(null);
+    setAvailableMoves([]);
+    setMultiCaptureActive(false);
+    setGameOver(false);
+    setOutcomeMessage(null);
+  };
+
+  const handleCellSizeChange = (value: number) => {
+    setCellSize(value);
+  };
+
+  const handleToggleHints = () => {
+    setShowHints((prev) => !prev);
+  };
+
+  // Einfache KI, die alle erlaubten Züge des Computers berechnet und einen auswählt.
+  // Der kleine Timeout simuliert "Nachdenken" und verhindert, dass sich die UI blockierend anfühlt.
+  useEffect(() => {
+    if (currentPlayer !== "ai" || multiCaptureActive || gameOver) {
+      return;
+    }
+
+    const aiThinkingDelay = window.setTimeout(() => {
+      const aiCandidates = collectMovesForPlayer(board, "ai");
+      if (aiCandidates.length === 0) {
+        endGameFor("human", `Sieg für ${getPlayerLabel("human")} – ${getPlayerLabel("ai")} hat keine Züge mehr.`);
+        return;
+      }
+
+      const chosen = chooseMoveByPriority(aiCandidates);
+      if (!chosen) {
+        endGameFor("human", `Sieg für ${getPlayerLabel("human")} – ${getPlayerLabel("ai")} hat keinen gültigen Zug gefunden.`);
+        return;
+      }
+
+      let result = applyMove(board, chosen.from, chosen.move, rows);
+      if (!result.movedPiece) {
+        endGameFor("human", `Sieg für ${getPlayerLabel("human")} – ${getPlayerLabel("ai")} konnte den Zug nicht ausführen.`);
+        return;
+      }
+
+      let workingBoard = result.board;
+      let currentPosition = result.to;
+
+      while (result.continuation.length > 0) {
+        const continuationMove = chooseContinuationMove(result.continuation);
+        result = applyMove(workingBoard, currentPosition, continuationMove, rows);
+        if (!result.movedPiece) {
+          break;
+        }
+        workingBoard = result.board;
+        currentPosition = result.to;
+      }
+
+      setBoard(workingBoard);
+      setSelected(null);
+      setAvailableMoves([]);
+      setMultiCaptureActive(false);
+
+      const evaluation = evaluateGameState(workingBoard, "human");
+      if (evaluation) {
+        endGameFor(evaluation.winner, evaluation.message);
+        return;
+      }
+
+      setCurrentPlayer("human");
+    }, 450);
+
+    return () => window.clearTimeout(aiThinkingDelay);
+  }, [board, currentPlayer, gameOver, multiCaptureActive, rows]);
+
+  // Klick-Handler für das UI: entscheidet je nach Situation,
+  // ob ein Stein ausgewählt oder ein Zug ausgeführt werden soll.
+  const handleCellClick = (row: number, col: number) => {
+    if (!isHumansTurn) {
+      return;
+    }
+
+    const targetPosition: Position = { row, col };
+
+    if (
+      multiCaptureActive &&
+      selected &&
+      !availableMoves.some((move) => positionsEqual(move.to, targetPosition))
+    ) {
+      // Während eines Mehrfachschlags bleibt der gerade bewegte Stein ausgewählt.
+      return;
+    }
+
+    const cellPiece = board[row][col];
+
+    if (cellPiece && cellPiece.owner === currentPlayer) {
+      if (selected && positionsEqual(selected, targetPosition)) {
+        if (!multiCaptureActive) {
+          setSelected(null);
+          setAvailableMoves([]);
+        }
+        return;
+      }
+
+      const moves = getMoves(board, row, col, cellPiece);
+      const captureMoves = moves.filter((move) => move.captures.length > 0);
+      const allowedMoves = hasForcedCaptures ? captureMoves : moves;
+
+      if (allowedMoves.length === 0) {
+        return;
+      }
+
+      setSelected(targetPosition);
+      setAvailableMoves(allowedMoves);
+      setMultiCaptureActive(false);
+      return;
+    }
+
+    if (selected) {
+      const chosenMove = availableMoves.find((move) => positionsEqual(move.to, targetPosition));
+      if (!chosenMove) {
+        return;
+      }
+
+      const result = applyMove(board, selected, chosenMove, rows);
+      if (!result.movedPiece) {
+        setSelected(null);
+        setAvailableMoves([]);
+        setMultiCaptureActive(false);
+        return;
+      }
+
+      setBoard(result.board);
+
+      if (result.continuation.length > 0) {
+        setSelected(result.to);
+        setAvailableMoves(result.continuation);
+        setMultiCaptureActive(true);
+        return;
+      }
+
+      setSelected(null);
+      setAvailableMoves([]);
+      setMultiCaptureActive(false);
+
+      const evaluation = evaluateGameState(result.board, "ai");
+      if (evaluation) {
+        endGameFor(evaluation.winner, evaluation.message);
+        return;
+      }
+
+      setCurrentPlayer("ai");
+    }
+  };
+
+  const currentPlayerLabel = currentPlayer === "human" ? "Mensch (hell)" : "KI (schwarz)";
+  const statusSuffix = !gameOver && hasForcedCaptures ? " – Schlagzwang" : "";
+
+  return (
+    <div className="w-full flex flex-col items-center gap-4 p-6">
+      <div className="w-full max-w-4xl">
+        <GameMenu
+          onNewGame={handleNewGame}
+          cellSize={cellSize}
+          onCellSizeChange={handleCellSizeChange}
+          showHints={showHints}
+          onToggleHints={handleToggleHints}
+        />
+      </div>
+
+      <h1 className="text-xl font-semibold">Dame – Spielbrett</h1>
+
+      <CheckersGrid
+        board={board}
+        files={files}
+        ranks={ranks}
+        cellSize={cellSize}
+        selected={selected}
+        availableMoves={availableMoves}
+        forcedCapturePositions={shouldHighlightHints ? forcedCapturePositions : []}
+        showHints={shouldHighlightHints}
+        isHumansTurn={isHumansTurn}
+        onCellClick={handleCellClick}
+      />
+
+      <div className="text-sm text-neutral-600">
+        Tipp: Passe die Zellgröße über das Menü oder per Prop <code>cell</code> an.
+      </div>
+
+      <StatusBanner
+        gameOver={gameOver}
+        outcomeMessage={outcomeMessage}
+        currentPlayerLabel={currentPlayerLabel}
+        statusSuffix={statusSuffix}
+        multiCaptureActive={multiCaptureActive}
+      />
+    </div>
+  );
+  // Bündelt wiederkehrende Aufgaben, wenn eine Partie endet
+  // (z. B. nach Sieg, Patt oder wenn die KI keine Züge mehr hat).
+  function endGameFor(winner: Player, message: string) {
+    setOutcomeMessage(message);
+    setGameOver(true);
+    setCurrentPlayer(winner);
+    setSelected(null);
+    setAvailableMoves([]);
+    setMultiCaptureActive(false);
+  }
+}
