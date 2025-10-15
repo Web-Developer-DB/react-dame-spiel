@@ -1,3 +1,5 @@
+// Präsentations-Komponente, die das Damebrett mit Tailwind und ARIA-Attributen zeichnet.
+// Sie erhält alle nötigen Daten als Props, bleibt also selbst "dumm" und leicht testbar.
 import React, { useMemo } from "react";
 import { Board, Move, Position } from "../../game/checkersTypes";
 import { positionsEqual } from "../../game/checkersLogic";
@@ -37,6 +39,7 @@ export function CheckersGrid({
   return (
     <>
       <div className="flex items-start gap-2">
+        {/* Linker Rand zeigt die Reihen-Labels (8 bis 1) an */}
         <div className="mt-[2px] flex flex-col-reverse select-none pr-1" style={{ height: ranks.length * cellSize }}>
           {ranks.map((rank) => (
             <div key={rank} className="flex items-center justify-end text-xs text-neutral-600" style={{ height: cellSize }}>
@@ -64,6 +67,7 @@ export function CheckersGrid({
               const isForcedPiece = showHints && forcedCapturePositions.some((pos) => positionsEqual(pos, position));
               const rankLabel = ranks[ranks.length - 1 - r];
 
+              // Text zur Beschreibung für Screenreader: erklärt Farbe, Besitzer und mögliche Züge.
               const pieceDescription =
                 cellPiece?.color === "dark"
                   ? cellPiece.king
@@ -117,6 +121,7 @@ export function CheckersGrid({
         </div>
       </div>
 
+      {/* Unter dem Brett werden die Spalten-Buchstaben (A bis H) angezeigt */}
       <div className="grid select-none" style={{ gridTemplateColumns: `repeat(${files.length}, ${cellSize}px)` }}>
         {files.map((file) => (
           <div key={file} className="text-center text-xs text-neutral-600" style={{ width: cellSize }}>

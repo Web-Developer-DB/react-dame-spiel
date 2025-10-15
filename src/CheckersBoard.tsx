@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+// Zentrale Container-Komponente: Hier steckt der gesamte Spielablauf der Dame-Partie.
+// Von hier aus steuern wir sowohl die Spiellogik als auch alle UI-Bausteine.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameMenu } from "./components/checkers/GameMenu";
 import { CheckersGrid } from "./components/checkers/CheckersGrid";
 import { StatusBanner } from "./components/checkers/StatusBanner";
@@ -17,36 +19,102 @@ import {
 } from "./game/checkersLogic";
 import { Board, Move, Player, Position } from "./game/checkersTypes";
 
-type Props = { cell?: number };
-
 // Die CheckersBoard-Komponente verwaltet den gesamten Spielfluss.
 // Sie orchestriert State, KI-Züge und Darstellung, delegiert aber Render-Details
 // an kleinere Komponenten (GameMenu, CheckersGrid, StatusBanner).
-export default function CheckersBoard({ cell = 72 }: Props) {
+export default function CheckersBoard() {
   const rows = BOARD_SIZE;
   const cols = BOARD_SIZE;
 
   // Layout-bezogene Daten wie Feldbeschriftungen lassen sich aus der Brettgröße ableiten.
+  // useMemo stellt sicher, dass wir die Arrays nur neu berechnen, wenn sich rows/cols ändern.
   const files = useMemo(() => Array.from({ length: cols }, (_, i) => String.fromCharCode(65 + i)), [cols]);
   const ranks = useMemo(() => Array.from({ length: rows }, (_, i) => `${rows - i}`), [rows]);
 
   // Zustand des Spiels
-  const [cellSize, setCellSize] = useState(cell);
+  // cellSize bestimmt die Größe einzelner Felder im UI.
+  const [cellSize, setCellSize] = useState(72);
+  // board hält das komplette Spielbrett inklusive Steine.
   const [board, setBoard] = useState<Board>(() => createInitialBoard(rows, cols));
+  // currentPlayer speichert, wer gerade am Zug ist.
   const [currentPlayer, setCurrentPlayer] = useState<Player>("human");
+  // selected merkt sich ein aktiv ausgewähltes Feld.
   const [selected, setSelected] = useState<Position | null>(null);
+  // availableMoves enthält alle legalen Züge für das aktuell ausgewählte Feld.
   const [availableMoves, setAvailableMoves] = useState<Move[]>([]);
+  // multiCaptureActive markiert, ob ein Mehrfachschlag in einer laufenden Animation fortgeführt wird.
   const [multiCaptureActive, setMultiCaptureActive] = useState(false);
+  // showHints entscheidet, ob visuelle Hilfen eingeblendet werden.
   const [showHints, setShowHints] = useState(true);
+  // gameOver markiert, ob die Partie beendet ist.
   const [gameOver, setGameOver] = useState(false);
+  // outcomeMessage fasst den Gewinner-Text für Spieler zusammen.
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
+  // showOutcomeDialog steuert, ob das Overlay mit der Ergebnisnachricht sichtbar ist.
+  const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
 
-  // Wenn der cell-Prop (z. B. über App.tsx) angepasst wird, übernehmen wir den neuen Wert.
+  // Referenz auf das Container-Element, um dessen Breite für die automatische Skalierung zu messen.
+  const boardContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Hilfsfunktion, die die Zellgröße dynamisch an den verfügbaren Platz anpasst.
+  const updateCellSize = useCallback(() => {
+    const containerWidth = boardContainerRef.current?.clientWidth ?? window.innerWidth;
+    if (!containerWidth) {
+      return;
+    }
+
+    const gapBetweenLabelsAndBoard = 8; // entspricht Tailwind gap-2
+    const effectiveWidth = Math.max(containerWidth - gapBetweenLabelsAndBoard, 0);
+    const maxAllowedCellSize = Math.floor(effectiveWidth / (cols + 1));
+    if (maxAllowedCellSize <= 0) {
+      return;
+    }
+
+    const minCellSize = 48;
+    const maxCellSize = 96;
+    const preferredSize = Math.min(maxAllowedCellSize, maxCellSize);
+    const nextSize = Math.min(maxAllowedCellSize, Math.max(preferredSize, minCellSize));
+
+    setCellSize((prev) => (prev !== nextSize ? nextSize : prev));
+  }, [cols]);
+
+  // Beim ersten Render die Größe berechnen.
   useEffect(() => {
-    setCellSize(cell);
-  }, [cell]);
+    updateCellSize();
+  }, [updateCellSize]);
+
+  // Auf Fenstergrößenänderungen reagieren, um das Brett responsiv zu halten.
+  useEffect(() => {
+    const handleResize = () => updateCellSize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [updateCellSize]);
+
+  // ResizeObserver reagiert auf Größenänderungen des Containers selbst (z. B. Layout-Wechsel).
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateCellSize());
+    const element = boardContainerRef.current;
+    if (!element) {
+      return;
+    }
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [updateCellSize]);
+
+  // Sobald das Spiel vorbei ist, wird automatisch das Ergebnis-Overlay geöffnet.
+  useEffect(() => {
+    if (gameOver) {
+      setShowOutcomeDialog(true);
+    }
+  }, [gameOver]);
 
   // Schlagzwang und mögliche Züge werden aus dem aktuellen Brett abgeleitet.
+  // useMemo reduziert überflüssige Berechnungen und sorgt für bessere Performance.
   const forcedCapturePositions = useMemo(
     () => findForcedCapturePositions(board, currentPlayer),
     [board, currentPlayer]
@@ -64,12 +132,10 @@ export default function CheckersBoard({ cell = 72 }: Props) {
     setMultiCaptureActive(false);
     setGameOver(false);
     setOutcomeMessage(null);
+    setShowOutcomeDialog(false);
   };
 
-  const handleCellSizeChange = (value: number) => {
-    setCellSize(value);
-  };
-
+  // Einsteigerfreundliche Option, um Hinweise während der Partie an- oder auszuschalten.
   const handleToggleHints = () => {
     setShowHints((prev) => !prev);
   };
@@ -216,10 +282,9 @@ export default function CheckersBoard({ cell = 72 }: Props) {
   return (
     <div className="w-full flex flex-col items-center gap-4 p-6">
       <div className="w-full max-w-4xl">
+        {/* Das Menü bietet Steuerungen, die nicht direkt in das Brett eingreifen müssen */}
         <GameMenu
           onNewGame={handleNewGame}
-          cellSize={cellSize}
-          onCellSizeChange={handleCellSizeChange}
           showHints={showHints}
           onToggleHints={handleToggleHints}
         />
@@ -227,23 +292,27 @@ export default function CheckersBoard({ cell = 72 }: Props) {
 
       <h1 className="text-xl font-semibold">Dame – Spielbrett</h1>
 
-      <CheckersGrid
-        board={board}
-        files={files}
-        ranks={ranks}
-        cellSize={cellSize}
-        selected={selected}
-        availableMoves={availableMoves}
-        forcedCapturePositions={shouldHighlightHints ? forcedCapturePositions : []}
-        showHints={shouldHighlightHints}
-        isHumansTurn={isHumansTurn}
-        onCellClick={handleCellClick}
-      />
-
-      <div className="text-sm text-neutral-600">
-        Tipp: Passe die Zellgröße über das Menü oder per Prop <code>cell</code> an.
+      <div ref={boardContainerRef} className="w-full max-w-4xl">
+        {/* CheckersGrid ist allein für die Darstellung des Bretts verantwortlich */}
+        <CheckersGrid
+          board={board}
+          files={files}
+          ranks={ranks}
+          cellSize={cellSize}
+          selected={selected}
+          availableMoves={availableMoves}
+          forcedCapturePositions={shouldHighlightHints ? forcedCapturePositions : []}
+          showHints={shouldHighlightHints}
+          isHumansTurn={isHumansTurn}
+          onCellClick={handleCellClick}
+        />
       </div>
 
+      <div className="text-sm text-neutral-600">
+        Tipp: Die Zellgröße passt sich automatisch an den verfügbaren Platz an.
+      </div>
+
+      {/* Der StatusBanner fasst verbleibende Hinweise zusammen */}
       <StatusBanner
         gameOver={gameOver}
         outcomeMessage={outcomeMessage}
@@ -251,6 +320,39 @@ export default function CheckersBoard({ cell = 72 }: Props) {
         statusSuffix={statusSuffix}
         multiCaptureActive={multiCaptureActive}
       />
+
+      {showOutcomeDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 px-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-live="assertive"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 text-neutral-800 shadow-xl"
+          >
+            {/* Anfängerfreundliches Overlay, das den Sieg- oder Niederlagentext hervorhebt */}
+            <h2 className="text-lg font-semibold">Spiel beendet</h2>
+            <p className="mt-2 text-sm">
+              {outcomeMessage ?? "Partie abgeschlossen."}
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowOutcomeDialog(false)}
+                className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              >
+                Schließen
+              </button>
+              <button
+                type="button"
+                onClick={handleNewGame}
+                className="rounded-full bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              >
+                Neues Spiel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   // Bündelt wiederkehrende Aufgaben, wenn eine Partie endet
@@ -262,5 +364,6 @@ export default function CheckersBoard({ cell = 72 }: Props) {
     setSelected(null);
     setAvailableMoves([]);
     setMultiCaptureActive(false);
+    setShowOutcomeDialog(true);
   }
 }

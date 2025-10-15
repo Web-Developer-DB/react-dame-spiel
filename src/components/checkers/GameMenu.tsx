@@ -1,19 +1,15 @@
+// Menükomponente mit Zusatzaktionen rund um das Spielbrett.
+// Sie zeigt Anfängern kontrollierte Formelemente (Checkboxen und Buttons) in React.
 import React from "react";
 
-// Das Spielmenü fasst alle Steuerelemente zusammen, die kein Brettwissen benötigen.
-// Junior-Entwickler können hier sehen, wie kontrollierte Formelemente in React umgesetzt werden.
 type GameMenuProps = {
   onNewGame: () => void;
-  cellSize: number;
-  onCellSizeChange: (value: number) => void;
   showHints: boolean;
   onToggleHints: () => void;
 };
 
 export function GameMenu({
   onNewGame,
-  cellSize,
-  onCellSizeChange,
   showHints,
   onToggleHints,
 }: GameMenuProps) {
@@ -42,24 +38,16 @@ export function GameMenu({
             <input
               type="checkbox"
               className="h-4 w-4 accent-indigo-500"
+              // checked und onChange machen aus der Checkbox ein kontrolliertes Eingabefeld.
               checked={showHints}
               onChange={onToggleHints}
             />
             Tipps hervorheben
           </label>
-          <label className="flex items-center gap-3">
-            <span>Feldgröße</span>
-            <input
-              type="range"
-              min={56}
-              max={96}
-              step={8}
-              value={cellSize}
-              onChange={(event) => onCellSizeChange(Number(event.target.value))}
-              aria-label="Feldgröße anpassen"
-            />
-            <span className="w-12 text-right tabular-nums">{cellSize}px</span>
-          </label>
+          {/* Hinweistext erklärt, dass keine manuelle Größenanpassung nötig ist */}
+          <p className="text-xs text-neutral-500">
+            Die Feldgröße passt sich automatisch an die Bildschirmbreite an.
+          </p>
         </div>
       </div>
     </div>

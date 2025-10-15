@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* App-Grundlayout */
+/* App-Grundlayout: sorgt für ein dunkles Umfeld, damit das Brett besser zur Geltung kommt */
 html,
 body {
   margin: 0;
@@ -15,5 +15,6 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
+  /* Das transparente Hintergundfeld erlaubt es, den Seitenhintergrund durchscheinen zu lassen */
   background-color: transparent;
 }
