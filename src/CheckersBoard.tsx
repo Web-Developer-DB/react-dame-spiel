@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameMenu } from "./components/checkers/GameMenu";
 import { CheckersGrid } from "./components/checkers/CheckersGrid";
 import { StatusBanner } from "./components/checkers/StatusBanner";
@@ -17,12 +17,10 @@ import {
 } from "./game/checkersLogic";
 import { Board, Move, Player, Position } from "./game/checkersTypes";
 
-type Props = { cell?: number };
-
 // Die CheckersBoard-Komponente verwaltet den gesamten Spielfluss.
 // Sie orchestriert State, KI-Züge und Darstellung, delegiert aber Render-Details
 // an kleinere Komponenten (GameMenu, CheckersGrid, StatusBanner).
-export default function CheckersBoard({ cell = 72 }: Props) {
+export default function CheckersBoard() {
   const rows = BOARD_SIZE;
   const cols = BOARD_SIZE;
 
@@ -31,7 +29,7 @@ export default function CheckersBoard({ cell = 72 }: Props) {
   const ranks = useMemo(() => Array.from({ length: rows }, (_, i) => `${rows - i}`), [rows]);
 
   // Zustand des Spiels
-  const [cellSize, setCellSize] = useState(cell);
+  const [cellSize, setCellSize] = useState(72);
   const [board, setBoard] = useState<Board>(() => createInitialBoard(rows, cols));
   const [currentPlayer, setCurrentPlayer] = useState<Player>("human");
   const [selected, setSelected] = useState<Position | null>(null);
@@ -41,10 +39,53 @@ export default function CheckersBoard({ cell = 72 }: Props) {
   const [gameOver, setGameOver] = useState(false);
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
 
-  // Wenn der cell-Prop (z. B. über App.tsx) angepasst wird, übernehmen wir den neuen Wert.
+  const boardContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const updateCellSize = useCallback(() => {
+    const containerWidth = boardContainerRef.current?.clientWidth ?? window.innerWidth;
+    if (!containerWidth) {
+      return;
+    }
+
+    const gapBetweenLabelsAndBoard = 8; // entspricht Tailwind gap-2
+    const effectiveWidth = Math.max(containerWidth - gapBetweenLabelsAndBoard, 0);
+    const maxAllowedCellSize = Math.floor(effectiveWidth / (cols + 1));
+    if (maxAllowedCellSize <= 0) {
+      return;
+    }
+
+    const minCellSize = 48;
+    const maxCellSize = 96;
+    const preferredSize = Math.min(maxAllowedCellSize, maxCellSize);
+    const nextSize = Math.min(maxAllowedCellSize, Math.max(preferredSize, minCellSize));
+
+    setCellSize((prev) => (prev !== nextSize ? nextSize : prev));
+  }, [cols]);
+
   useEffect(() => {
-    setCellSize(cell);
-  }, [cell]);
+    updateCellSize();
+  }, [updateCellSize]);
+
+  useEffect(() => {
+    const handleResize = () => updateCellSize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [updateCellSize]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateCellSize());
+    const element = boardContainerRef.current;
+    if (!element) {
+      return;
+    }
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [updateCellSize]);
 
   // Schlagzwang und mögliche Züge werden aus dem aktuellen Brett abgeleitet.
   const forcedCapturePositions = useMemo(
@@ -64,10 +105,6 @@ export default function CheckersBoard({ cell = 72 }: Props) {
     setMultiCaptureActive(false);
     setGameOver(false);
     setOutcomeMessage(null);
-  };
-
-  const handleCellSizeChange = (value: number) => {
-    setCellSize(value);
   };
 
   const handleToggleHints = () => {
@@ -218,8 +255,6 @@ export default function CheckersBoard({ cell = 72 }: Props) {
       <div className="w-full max-w-4xl">
         <GameMenu
           onNewGame={handleNewGame}
-          cellSize={cellSize}
-          onCellSizeChange={handleCellSizeChange}
           showHints={showHints}
           onToggleHints={handleToggleHints}
         />
@@ -227,21 +262,23 @@ export default function CheckersBoard({ cell = 72 }: Props) {
 
       <h1 className="text-xl font-semibold">Dame – Spielbrett</h1>
 
-      <CheckersGrid
-        board={board}
-        files={files}
-        ranks={ranks}
-        cellSize={cellSize}
-        selected={selected}
-        availableMoves={availableMoves}
-        forcedCapturePositions={shouldHighlightHints ? forcedCapturePositions : []}
-        showHints={shouldHighlightHints}
-        isHumansTurn={isHumansTurn}
-        onCellClick={handleCellClick}
-      />
+      <div ref={boardContainerRef} className="w-full max-w-4xl">
+        <CheckersGrid
+          board={board}
+          files={files}
+          ranks={ranks}
+          cellSize={cellSize}
+          selected={selected}
+          availableMoves={availableMoves}
+          forcedCapturePositions={shouldHighlightHints ? forcedCapturePositions : []}
+          showHints={shouldHighlightHints}
+          isHumansTurn={isHumansTurn}
+          onCellClick={handleCellClick}
+        />
+      </div>
 
       <div className="text-sm text-neutral-600">
-        Tipp: Passe die Zellgröße über das Menü oder per Prop <code>cell</code> an.
+        Tipp: Die Zellgröße passt sich automatisch an den verfügbaren Platz an.
       </div>
 
       <StatusBanner
