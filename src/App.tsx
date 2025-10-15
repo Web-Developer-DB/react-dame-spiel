@@ -8,14 +8,14 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* flex-1 sorgt dafür, dass das Brett den verfügbaren Platz nutzt */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-4 sm:p-6">
         {/* Das eigentliche Dame-Spiel */}
         <CheckersBoard />
       </div>
 
       {/* Ein dezenter Footer als Abschluss der Seite */}
-      <footer className="border-t border-neutral-200 bg-white/80 px-6 py-4 text-center text-sm text-neutral-600 backdrop-blur">
-        © {new Date().getFullYear()} Dimitri B – MIT License
+      <footer className="border-t border-white/10 bg-white/5 px-4 py-2 text-center text-xs font-medium text-slate-200 backdrop-blur-sm sm:px-6">
+        © {new Date().getFullYear()} Dimitri B · MIT License
       </footer>
     </div>
   )

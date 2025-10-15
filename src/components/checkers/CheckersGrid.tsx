@@ -15,6 +15,7 @@ type CheckersGridProps = {
   forcedCapturePositions: Position[];
   showHints: boolean;
   isHumansTurn: boolean;
+  compactLayout: boolean;
   onCellClick: (row: number, col: number) => void;
 };
 
@@ -30,6 +31,7 @@ export function CheckersGrid({
   forcedCapturePositions,
   showHints,
   isHumansTurn,
+  compactLayout,
   onCellClick,
 }: CheckersGridProps) {
   // Wir berechnen die möglichen Ziele nur einmal pro Render und speichern sie,
@@ -38,20 +40,30 @@ export function CheckersGrid({
 
   return (
     <>
-      <div className="flex items-start gap-2">
+      <div
+        className={[
+          "flex w-full items-start",
+          compactLayout ? "justify-center" : "justify-start gap-2",
+        ].join(" ")}
+      >
         {/* Linker Rand zeigt die Reihen-Labels (8 bis 1) an */}
-        <div className="mt-[2px] flex flex-col-reverse select-none pr-1" style={{ height: ranks.length * cellSize }}>
-          {ranks.map((rank) => (
-            <div key={rank} className="flex items-center justify-end text-xs text-neutral-600" style={{ height: cellSize }}>
-              {rank}
-            </div>
-          ))}
-        </div>
+        {!compactLayout && (
+          <div className="mt-[2px] flex flex-col-reverse select-none pr-1" style={{ height: ranks.length * cellSize }}>
+            {ranks.map((rank) => (
+              <div key={rank} className="flex items-center justify-end text-xs text-neutral-600" style={{ height: cellSize }}>
+                {rank}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div
           role="grid"
           aria-label={`Damebrett ${ranks.length} mal ${files.length}`}
-          className="grid overflow-hidden rounded-2xl border border-neutral-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)]"
+          className={[
+            "grid overflow-hidden border border-neutral-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)]",
+            compactLayout ? "rounded-3xl" : "rounded-2xl",
+          ].join(" ")}
           style={{
             gridTemplateColumns: `repeat(${files.length}, ${cellSize}px)`,
             gridTemplateRows: `repeat(${ranks.length}, ${cellSize}px)`,
@@ -122,13 +134,15 @@ export function CheckersGrid({
       </div>
 
       {/* Unter dem Brett werden die Spalten-Buchstaben (A bis H) angezeigt */}
-      <div className="grid select-none" style={{ gridTemplateColumns: `repeat(${files.length}, ${cellSize}px)` }}>
-        {files.map((file) => (
-          <div key={file} className="text-center text-xs text-neutral-600" style={{ width: cellSize }}>
-            {file}
-          </div>
-        ))}
-      </div>
+      {!compactLayout && (
+        <div className="grid select-none" style={{ gridTemplateColumns: `repeat(${files.length}, ${cellSize}px)` }}>
+          {files.map((file) => (
+            <div key={file} className="text-center text-xs text-neutral-600" style={{ width: cellSize }}>
+              {file}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
