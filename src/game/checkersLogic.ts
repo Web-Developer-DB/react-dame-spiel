@@ -159,11 +159,27 @@ export function applyMove(
 // Prüft, ob eine Partei verloren hat (keine Steine oder keine Züge).
 export function evaluateGameState(board: Board, playerToMove: Player): GameEvaluation | null {
   const opponent = playerToMove === "human" ? "ai" : "human";
-  const remainingPieces = countPieces(board, playerToMove);
-  if (remainingPieces === 0) {
+  const humanPieces = countPieces(board, "human");
+  const aiPieces = countPieces(board, "ai");
+
+  if (humanPieces === 0 && aiPieces === 0) {
     return {
       winner: opponent,
-      message: `Sieg für ${getPlayerLabel(opponent)} – ${getPlayerLabel(playerToMove)} hat keine Steine mehr.`,
+      message: `Sieg für ${getPlayerLabel(opponent)} – beide Seiten haben keine Steine mehr.`,
+    };
+  }
+
+  if (humanPieces === 0) {
+    return {
+      winner: "ai",
+      message: `Sieg für ${getPlayerLabel("ai")} – ${getPlayerLabel("human")} hat keine Steine mehr.`,
+    };
+  }
+
+  if (aiPieces === 0) {
+    return {
+      winner: "human",
+      message: `Sieg für ${getPlayerLabel("human")} – ${getPlayerLabel("ai")} hat keine Steine mehr.`,
     };
   }
 
