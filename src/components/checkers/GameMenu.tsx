@@ -4,16 +4,12 @@ import React from "react";
 // Junior-Entwickler können hier sehen, wie kontrollierte Formelemente in React umgesetzt werden.
 type GameMenuProps = {
   onNewGame: () => void;
-  cellSize: number;
-  onCellSizeChange: (value: number) => void;
   showHints: boolean;
   onToggleHints: () => void;
 };
 
 export function GameMenu({
   onNewGame,
-  cellSize,
-  onCellSizeChange,
   showHints,
   onToggleHints,
 }: GameMenuProps) {
@@ -47,19 +43,9 @@ export function GameMenu({
             />
             Tipps hervorheben
           </label>
-          <label className="flex items-center gap-3">
-            <span>Feldgröße</span>
-            <input
-              type="range"
-              min={56}
-              max={96}
-              step={8}
-              value={cellSize}
-              onChange={(event) => onCellSizeChange(Number(event.target.value))}
-              aria-label="Feldgröße anpassen"
-            />
-            <span className="w-12 text-right tabular-nums">{cellSize}px</span>
-          </label>
+          <p className="text-xs text-neutral-500">
+            Die Feldgröße passt sich automatisch an die Bildschirmbreite an.
+          </p>
         </div>
       </div>
     </div>
