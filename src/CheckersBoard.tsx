@@ -1,3 +1,5 @@
+// Zentrale Container-Komponente: Hier steckt der gesamte Spielablauf der Dame-Partie.
+// Von hier aus steuern wir sowohl die Spiellogik als auch alle UI-Bausteine.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameMenu } from "./components/checkers/GameMenu";
 import { CheckersGrid } from "./components/checkers/CheckersGrid";
@@ -25,23 +27,36 @@ export default function CheckersBoard() {
   const cols = BOARD_SIZE;
 
   // Layout-bezogene Daten wie Feldbeschriftungen lassen sich aus der Brettgröße ableiten.
+  // useMemo stellt sicher, dass wir die Arrays nur neu berechnen, wenn sich rows/cols ändern.
   const files = useMemo(() => Array.from({ length: cols }, (_, i) => String.fromCharCode(65 + i)), [cols]);
   const ranks = useMemo(() => Array.from({ length: rows }, (_, i) => `${rows - i}`), [rows]);
 
   // Zustand des Spiels
+  // cellSize bestimmt die Größe einzelner Felder im UI.
   const [cellSize, setCellSize] = useState(72);
+  // board hält das komplette Spielbrett inklusive Steine.
   const [board, setBoard] = useState<Board>(() => createInitialBoard(rows, cols));
+  // currentPlayer speichert, wer gerade am Zug ist.
   const [currentPlayer, setCurrentPlayer] = useState<Player>("human");
+  // selected merkt sich ein aktiv ausgewähltes Feld.
   const [selected, setSelected] = useState<Position | null>(null);
+  // availableMoves enthält alle legalen Züge für das aktuell ausgewählte Feld.
   const [availableMoves, setAvailableMoves] = useState<Move[]>([]);
+  // multiCaptureActive markiert, ob ein Mehrfachschlag in einer laufenden Animation fortgeführt wird.
   const [multiCaptureActive, setMultiCaptureActive] = useState(false);
+  // showHints entscheidet, ob visuelle Hilfen eingeblendet werden.
   const [showHints, setShowHints] = useState(true);
+  // gameOver markiert, ob die Partie beendet ist.
   const [gameOver, setGameOver] = useState(false);
+  // outcomeMessage fasst den Gewinner-Text für Spieler zusammen.
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
+  // showOutcomeDialog steuert, ob das Overlay mit der Ergebnisnachricht sichtbar ist.
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
 
+  // Referenz auf das Container-Element, um dessen Breite für die automatische Skalierung zu messen.
   const boardContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Hilfsfunktion, die die Zellgröße dynamisch an den verfügbaren Platz anpasst.
   const updateCellSize = useCallback(() => {
     const containerWidth = boardContainerRef.current?.clientWidth ?? window.innerWidth;
     if (!containerWidth) {
@@ -63,16 +78,19 @@ export default function CheckersBoard() {
     setCellSize((prev) => (prev !== nextSize ? nextSize : prev));
   }, [cols]);
 
+  // Beim ersten Render die Größe berechnen.
   useEffect(() => {
     updateCellSize();
   }, [updateCellSize]);
 
+  // Auf Fenstergrößenänderungen reagieren, um das Brett responsiv zu halten.
   useEffect(() => {
     const handleResize = () => updateCellSize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [updateCellSize]);
 
+  // ResizeObserver reagiert auf Größenänderungen des Containers selbst (z. B. Layout-Wechsel).
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") {
       return;
@@ -88,6 +106,7 @@ export default function CheckersBoard() {
     return () => observer.disconnect();
   }, [updateCellSize]);
 
+  // Sobald das Spiel vorbei ist, wird automatisch das Ergebnis-Overlay geöffnet.
   useEffect(() => {
     if (gameOver) {
       setShowOutcomeDialog(true);
@@ -95,6 +114,7 @@ export default function CheckersBoard() {
   }, [gameOver]);
 
   // Schlagzwang und mögliche Züge werden aus dem aktuellen Brett abgeleitet.
+  // useMemo reduziert überflüssige Berechnungen und sorgt für bessere Performance.
   const forcedCapturePositions = useMemo(
     () => findForcedCapturePositions(board, currentPlayer),
     [board, currentPlayer]
@@ -115,6 +135,7 @@ export default function CheckersBoard() {
     setShowOutcomeDialog(false);
   };
 
+  // Einsteigerfreundliche Option, um Hinweise während der Partie an- oder auszuschalten.
   const handleToggleHints = () => {
     setShowHints((prev) => !prev);
   };
@@ -261,6 +282,7 @@ export default function CheckersBoard() {
   return (
     <div className="w-full flex flex-col items-center gap-4 p-6">
       <div className="w-full max-w-4xl">
+        {/* Das Menü bietet Steuerungen, die nicht direkt in das Brett eingreifen müssen */}
         <GameMenu
           onNewGame={handleNewGame}
           showHints={showHints}
@@ -271,6 +293,7 @@ export default function CheckersBoard() {
       <h1 className="text-xl font-semibold">Dame – Spielbrett</h1>
 
       <div ref={boardContainerRef} className="w-full max-w-4xl">
+        {/* CheckersGrid ist allein für die Darstellung des Bretts verantwortlich */}
         <CheckersGrid
           board={board}
           files={files}
@@ -289,6 +312,7 @@ export default function CheckersBoard() {
         Tipp: Die Zellgröße passt sich automatisch an den verfügbaren Platz an.
       </div>
 
+      {/* Der StatusBanner fasst verbleibende Hinweise zusammen */}
       <StatusBanner
         gameOver={gameOver}
         outcomeMessage={outcomeMessage}
@@ -305,6 +329,7 @@ export default function CheckersBoard() {
             aria-live="assertive"
             className="w-full max-w-sm rounded-2xl bg-white p-6 text-neutral-800 shadow-xl"
           >
+            {/* Anfängerfreundliches Overlay, das den Sieg- oder Niederlagentext hervorhebt */}
             <h2 className="text-lg font-semibold">Spiel beendet</h2>
             <p className="mt-2 text-sm">
               {outcomeMessage ?? "Partie abgeschlossen."}

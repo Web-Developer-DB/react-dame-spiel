@@ -1,7 +1,7 @@
+// Menükomponente mit Zusatzaktionen rund um das Spielbrett.
+// Sie zeigt Anfängern kontrollierte Formelemente (Checkboxen und Buttons) in React.
 import React from "react";
 
-// Das Spielmenü fasst alle Steuerelemente zusammen, die kein Brettwissen benötigen.
-// Junior-Entwickler können hier sehen, wie kontrollierte Formelemente in React umgesetzt werden.
 type GameMenuProps = {
   onNewGame: () => void;
   showHints: boolean;
@@ -38,11 +38,13 @@ export function GameMenu({
             <input
               type="checkbox"
               className="h-4 w-4 accent-indigo-500"
+              // checked und onChange machen aus der Checkbox ein kontrolliertes Eingabefeld.
               checked={showHints}
               onChange={onToggleHints}
             />
             Tipps hervorheben
           </label>
+          {/* Hinweistext erklärt, dass keine manuelle Größenanpassung nötig ist */}
           <p className="text-xs text-neutral-500">
             Die Feldgröße passt sich automatisch an die Bildschirmbreite an.
           </p>
