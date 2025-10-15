@@ -38,6 +38,7 @@ export default function CheckersBoard() {
   const [showHints, setShowHints] = useState(true);
   const [gameOver, setGameOver] = useState(false);
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
+  const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
 
   const boardContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -87,6 +88,12 @@ export default function CheckersBoard() {
     return () => observer.disconnect();
   }, [updateCellSize]);
 
+  useEffect(() => {
+    if (gameOver) {
+      setShowOutcomeDialog(true);
+    }
+  }, [gameOver]);
+
   // Schlagzwang und mögliche Züge werden aus dem aktuellen Brett abgeleitet.
   const forcedCapturePositions = useMemo(
     () => findForcedCapturePositions(board, currentPlayer),
@@ -105,6 +112,7 @@ export default function CheckersBoard() {
     setMultiCaptureActive(false);
     setGameOver(false);
     setOutcomeMessage(null);
+    setShowOutcomeDialog(false);
   };
 
   const handleToggleHints = () => {
@@ -288,6 +296,38 @@ export default function CheckersBoard() {
         statusSuffix={statusSuffix}
         multiCaptureActive={multiCaptureActive}
       />
+
+      {showOutcomeDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 px-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-live="assertive"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 text-neutral-800 shadow-xl"
+          >
+            <h2 className="text-lg font-semibold">Spiel beendet</h2>
+            <p className="mt-2 text-sm">
+              {outcomeMessage ?? "Partie abgeschlossen."}
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowOutcomeDialog(false)}
+                className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              >
+                Schließen
+              </button>
+              <button
+                type="button"
+                onClick={handleNewGame}
+                className="rounded-full bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              >
+                Neues Spiel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   // Bündelt wiederkehrende Aufgaben, wenn eine Partie endet
@@ -299,5 +339,6 @@ export default function CheckersBoard() {
     setSelected(null);
     setAvailableMoves([]);
     setMultiCaptureActive(false);
+    setShowOutcomeDialog(true);
   }
 }
