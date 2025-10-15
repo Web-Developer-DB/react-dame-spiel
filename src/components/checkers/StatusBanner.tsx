@@ -21,7 +21,7 @@ export function StatusBanner({
   // Sobald gameOver wahr ist, zeigen wir einen deutlich markierten Endtext.
   if (gameOver) {
     return (
-      <div className="text-sm text-neutral-700">
+      <div className="text-xs text-neutral-700 sm:text-sm">
         <span className="font-medium text-emerald-700">
           {outcomeMessage ?? "Partie beendet."}
         </span>
@@ -31,7 +31,7 @@ export function StatusBanner({
 
   // Während der laufenden Partie informieren wir, wer am Zug ist und ob ein Schlagzwang besteht.
   return (
-    <div className="text-sm text-neutral-700">
+    <div className="text-xs text-neutral-700 sm:text-sm">
       Am Zug: <span className="font-medium">{currentPlayerLabel}</span>
       {statusSuffix}
       {multiCaptureActive ? " – Mehrfachschlag fortsetzen" : ""}
