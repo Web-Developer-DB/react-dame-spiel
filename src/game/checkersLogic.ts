@@ -112,6 +112,124 @@ export function chooseMoveByPriority(candidates: CandidateMove[]): CandidateMove
   return bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
 }
 
+// Bewertet das Brett grob aus Sicht der KI: positive Werte sind vorteilhaft für die KI.
+export function evaluateBoardHeuristic(board: Board): number {
+  let score = 0;
+  board.forEach((row) => {
+    row.forEach((cell) => {
+      if (!cell) {
+        return;
+      }
+      const pieceValue = cell.king ? 3 : 1;
+      score += cell.owner === "ai" ? pieceValue : -pieceValue;
+    });
+  });
+  return score;
+}
+
+type DifficultyParams = {
+  candidates: CandidateMove[];
+  board: Board;
+  rows: number;
+  difficulty: number;
+};
+
+// Wählt je nach Schwierigkeitsgrad einen passenden KI-Zug aus.
+export function chooseMoveWithDifficulty({
+  candidates,
+  board,
+  rows,
+  difficulty,
+}: DifficultyParams): CandidateMove | null {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const clamped = Math.min(5, Math.max(1, Math.round(difficulty)));
+
+  if (clamped === 1) {
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  if (clamped === 2) {
+    const captureMoves = candidates.filter((candidate) => candidate.move.captures.length > 0);
+    const pool = captureMoves.length > 0 && Math.random() < 0.7 ? captureMoves : candidates;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  if (clamped === 3) {
+    return chooseMoveByPriority(candidates);
+  }
+
+  const scored = candidates.map((candidate) => analyzeCandidate(board, candidate, rows));
+  const epsilon = 1e-6;
+
+  if (clamped === 4) {
+    const bestScore = Math.max(...scored.map((entry) => entry.score));
+    const bestCandidates = scored
+      .filter((entry) => Math.abs(entry.score - bestScore) < epsilon)
+      .map((entry) => entry.candidate);
+    return bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+  }
+
+  // Schwierigkeitsgrad 5: einfacher Minimax-Blick voraus (1 Halbzug Tiefe)
+  let bestChoice: { candidate: CandidateMove | null; value: number } = {
+    candidate: null,
+    value: -Infinity,
+  };
+
+  for (const entry of scored) {
+    const responseScore = computeHumanResponseScore(entry.futureBoard, rows);
+    if (responseScore > bestChoice.value + epsilon) {
+      bestChoice = { candidate: entry.candidate, value: responseScore };
+      continue;
+    }
+    if (Math.abs(responseScore - bestChoice.value) < epsilon && Math.random() < 0.5) {
+      bestChoice = { candidate: entry.candidate, value: responseScore };
+    }
+  }
+
+  return bestChoice.candidate ?? candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+type CandidateAnalysis = {
+  candidate: CandidateMove;
+  score: number;
+  futureBoard: Board;
+};
+
+function analyzeCandidate(board: Board, candidate: CandidateMove, rows: number): CandidateAnalysis {
+  const originPiece = board[candidate.from.row]?.[candidate.from.col] ?? null;
+  const result = applyMove(board, candidate.from, candidate.move, rows);
+  const baseScore = evaluateBoardHeuristic(result.board);
+  const captureBonus = candidate.move.captures.length * 0.75;
+  const promoted =
+    originPiece && !originPiece.king && result.movedPiece && result.movedPiece.king ? 1.5 : 0;
+  return {
+    candidate,
+    score: baseScore + captureBonus + promoted,
+    futureBoard: result.board,
+  };
+}
+
+function computeHumanResponseScore(boardAfterAiMove: Board, rows: number): number {
+  const humanMoves = collectMovesForPlayer(boardAfterAiMove, "human");
+  if (humanMoves.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  let worstCase = Number.POSITIVE_INFINITY;
+  for (const move of humanMoves) {
+    const outcome = applyMove(boardAfterAiMove, move.from, move.move, rows);
+    const evaluation = evaluateBoardHeuristic(outcome.board);
+    if (evaluation < worstCase) {
+      worstCase = evaluation;
+    }
+  }
+
+  return worstCase;
+}
+
 // Für Mehrfachschläge gelten dieselben Prioritätsregeln wie beim ersten Zug.
 export function chooseContinuationMove(moves: Move[]): Move {
   if (moves.length === 0) {

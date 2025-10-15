@@ -7,7 +7,7 @@ import { StatusBanner } from "./components/checkers/StatusBanner";
 import {
   applyMove,
   chooseContinuationMove,
-  chooseMoveByPriority,
+  chooseMoveWithDifficulty,
   collectMovesForPlayer,
   createInitialBoard,
   evaluateGameState,
@@ -26,6 +26,7 @@ export default function CheckersBoard() {
   const rows = BOARD_SIZE;
   const cols = BOARD_SIZE;
   const [isCompactLayout, setIsCompactLayout] = useState(false);
+  const [difficulty, setDifficulty] = useState(3);
 
   // Layout-bezogene Daten wie Feldbeschriftungen lassen sich aus der Brettgröße ableiten.
   // useMemo stellt sicher, dass wir die Arrays nur neu berechnen, wenn sich rows/cols ändern.
@@ -159,6 +160,11 @@ export default function CheckersBoard() {
     setShowOutcomeDialog(false);
   };
 
+  const handleDifficultyChange = (nextLevel: number) => {
+    const clamped = Math.min(5, Math.max(1, Math.round(nextLevel)));
+    setDifficulty(clamped);
+  };
+
   // Einfache KI, die alle erlaubten Züge des Computers berechnet und einen auswählt.
   // Der kleine Timeout simuliert "Nachdenken" und verhindert, dass sich die UI blockierend anfühlt.
   useEffect(() => {
@@ -173,7 +179,12 @@ export default function CheckersBoard() {
         return;
       }
 
-      const chosen = chooseMoveByPriority(aiCandidates);
+      const chosen = chooseMoveWithDifficulty({
+        candidates: aiCandidates,
+        board,
+        rows,
+        difficulty,
+      });
       if (!chosen) {
         endGameFor("human", `Sieg für ${getPlayerLabel("human")} – ${getPlayerLabel("ai")} hat keinen gültigen Zug gefunden.`);
         return;
@@ -213,7 +224,7 @@ export default function CheckersBoard() {
     }, 450);
 
     return () => window.clearTimeout(aiThinkingDelay);
-  }, [board, currentPlayer, gameOver, multiCaptureActive, rows]);
+  }, [board, currentPlayer, difficulty, gameOver, multiCaptureActive, rows]);
 
   // Klick-Handler für das UI: entscheidet je nach Situation,
   // ob ein Stein ausgewählt oder ein Zug ausgeführt werden soll.
@@ -304,6 +315,8 @@ export default function CheckersBoard() {
         {/* Das Menü bietet Steuerungen, die nicht direkt in das Brett eingreifen müssen */}
         <GameMenu
           onNewGame={handleNewGame}
+          difficulty={difficulty}
+          onDifficultyChange={handleDifficultyChange}
         />
       </div>
 
